@@ -1,0 +1,86 @@
+#include <Arduino.h>
+#include <SPI.h>
+#include "../lib/arduino-mcp2515/mcp2515.h"
+
+struct can_frame canMsgRead;
+struct can_frame canMsg1;
+struct can_frame canMsg2;
+
+const int Kp = 3.5;
+const int set_vel = 1500;
+MCP2515 mcp2515(10);
+
+void setup()
+{
+  canMsg1.can_id = 0x200;
+  canMsg1.can_dlc = 8;
+  canMsg1.data[0] = 0x00;
+  canMsg1.data[1] = 0x00;
+  canMsg1.data[2] = 0x00;
+  canMsg1.data[3] = 0x00;
+  canMsg1.data[4] = 0x00;
+  canMsg1.data[5] = 0x00;
+  canMsg1.data[6] = 0x00;
+  canMsg1.data[7] = 0x00;
+
+  canMsg2.can_id = 0x1FF;
+  canMsg2.can_dlc = 8;
+  canMsg2.data[0] = 0x00;
+  canMsg2.data[1] = 0x00;
+  canMsg2.data[2] = 0x00;
+  canMsg2.data[3] = 0x00;
+  canMsg2.data[4] = 0x00;
+  canMsg2.data[5] = 0x00;
+  canMsg2.data[6] = 0x00;
+  canMsg2.data[7] = 0x00;
+
+  while (!Serial)
+    ;
+  Serial.begin(115200);
+
+  mcp2515.reset();
+  mcp2515.setBitrate(CAN_1000KBPS, MCP_8MHZ);
+  mcp2515.setNormalMode();
+}
+
+void loop()
+{
+  if (mcp2515.readMessage(&canMsgRead) == MCP2515::ERROR_OK)
+  {
+    // Serial.print("id = ");
+    // Serial.print(canMsgRead.can_id, HEX); // print ID
+    // Serial.println();
+    // Serial.print("dlc = ");
+    // Serial.print(canMsgRead.can_dlc, HEX); // print DLC
+    // Serial.println();
+
+    // int pos = canMsgRead.data[0] << 8 | canMsgRead.data[1];
+    int vel = canMsgRead.data[2] << 8 | canMsgRead.data[3];
+
+    // int torqueCurrent = canMsgRead.data[4] << 8 | canMsgRead.data[5];
+    // int temperture = canMsgRead.data[6];
+    int current = Kp * (set_vel - vel);
+    int higherByte = current >> 8;
+    int lowerByte = higherByte << 8 ^ current;
+    canMsg2.data[0] = higherByte;
+    canMsg2.data[1] = lowerByte;
+    mcp2515.sendMessage(&canMsg1);
+    mcp2515.sendMessage(&canMsg2);
+    // Serial.print("Position: ");
+    // Serial.print(pos, DEC);
+    // Serial.println();
+    Serial.print("Velocity: ");
+    Serial.print(vel);
+    Serial.println();
+    Serial.print("Current: ");
+    Serial.print(current);
+    Serial.println();
+    // Serial.print("Torque Current: ");
+    // Serial.print(torqueCurrent, DEC);
+    // Serial.println();
+    // Serial.print("Temperture: ");
+    // Serial.print(temperture, DEC);
+    // Serial.println();
+  }
+  delay(1);
+}
